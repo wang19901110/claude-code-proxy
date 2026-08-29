@@ -17,10 +17,10 @@ Hy3 上游偶尔缺少 Anthropic SSE 的结束事件。代理会在上游正常�
 ## 环境要求
 
 - Windows
-- PHP 8.1 或更高版本（启动脚本会检查 `php` 是否在 `PATH` 中）
+- 项目自带 PHP 8.3.2 运行时，无需将 PHP 加入 `PATH`
 - B.AI API Key
 
-项目包含 `php8.3.2nts` 运行时，并已安装 Workerman 依赖；若 `vendor` 被删除，启动脚本会尝试使用 Composer 重新安装。
+项目根目录包含 `php8.3.2nts` 运行时和 `vendor` 依赖；代理源码、配置与日志位于 `b.ai`。若 `vendor` 被删除，启动脚本会尝试使用 Composer 重新安装到项目根目录。
 
 ## 配置
 
@@ -43,7 +43,7 @@ UPSTREAM_TIMEOUT=180
 
 ## 启动与停止
 
-双击 [start-proxy.bat](C:/Users/Administrator/Desktop/_bai/start-proxy.bat)，或在此目录运行：
+双击 [start-proxy.bat](C:/Users/Administrator/Desktop/claude-code-proxy/b.ai/start-proxy.bat)，或在 `b.ai` 目录运行：
 
 ```powershell
 .\start-proxy.bat
@@ -90,7 +90,7 @@ Base URL: http://127.0.0.1:8787
 [15:59:21] [INFO] id=... model=hy3 status=200 latency=3030ms bytes=3802 repaired_sse=yes
 ```
 
-完整的 JSON Lines 日志位于 [workerman.log](C:/Users/Administrator/Desktop/_bai/workerman.log)。日志包含请求 ID、模型、状态码、耗时、流式字节数和错误类型；不会记录 API Key、提示词或回复正文。
+完整的 JSON Lines 日志位于 [workerman.log](C:/Users/Administrator/Desktop/claude-code-proxy/b.ai/workerman.log)。日志包含请求 ID、模型、状态码、耗时、流式字节数和错误类型；不会记录 API Key、提示词或回复正文。
 
 常见情况：
 
@@ -101,9 +101,13 @@ Base URL: http://127.0.0.1:8787
 ## 项目结构
 
 ```text
-proxy.php          # Workerman 代理、模型映射、SSE 修复和日志
-start-proxy.bat    # Windows 启动脚本
-.env               # 本机私密配置，不应提交
-.env.example       # 配置模板
-workerman.log      # 当前一次运行的 JSON 日志
+claude-code-proxy/
+├─ php8.3.2nts/    # 项目共用 PHP 运行时
+├─ vendor/         # 项目共用 Composer 依赖
+└─ b.ai/
+   ├─ proxy.php          # Workerman 代理、模型映射、SSE 修复和日志
+   ├─ start-proxy.bat    # Windows 启动脚本
+   ├─ .env               # 本机私密配置，不应提交
+   ├─ .env.example       # 配置模板
+   └─ workerman.log      # 当前一次运行的 JSON 日志
 ```

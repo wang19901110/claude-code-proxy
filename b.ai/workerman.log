@@ -1,0 +1,3 @@
+{"timestamp":"2026-08-29T16:31:30+00:00","level":"info","message":"proxy_started","context":{"host":"127.0.0.1","port":8787,"model_count":3,"upstream_timeout":180}}
+{"timestamp":"2026-08-29T16:31:37+00:00","level":"info","message":"request_received","context":{"request_id":"e616b5f7391c77b7","method":"HEAD","path":"/api/hello"}}
+{"timestamp":"2026-08-29T16:31:37+00:00","level":"info","message":"request_completed","context":{"request_id":"e616b5f7391c77b7","status":200,"endpoint":"api_hello","latency_ms":2}}

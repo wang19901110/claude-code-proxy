@@ -1,9 +1,0 @@
-{"timestamp":"2026-08-29T16:17:29+00:00","level":"info","message":"proxy_started","context":{"host":"127.0.0.1","port":8787,"model_count":3,"upstream_timeout":180}}
-{"timestamp":"2026-08-29T16:17:37+00:00","level":"info","message":"request_received","context":{"request_id":"2ecb82c138414a56","method":"HEAD","path":"/api/hello"}}
-{"timestamp":"2026-08-29T16:17:37+00:00","level":"info","message":"request_completed","context":{"request_id":"2ecb82c138414a56","status":200,"endpoint":"api_hello","latency_ms":5}}
-{"timestamp":"2026-08-29T16:17:37+00:00","level":"info","message":"request_received","context":{"request_id":"ee08119f99cc66d1","method":"HEAD","path":"/api/hello"}}
-{"timestamp":"2026-08-29T16:17:37+00:00","level":"info","message":"request_completed","context":{"request_id":"ee08119f99cc66d1","status":200,"endpoint":"api_hello","latency_ms":3}}
-{"timestamp":"2026-08-29T16:17:37+00:00","level":"info","message":"request_received","context":{"request_id":"1058667b6cbdacde","method":"HEAD","path":"/api/hello"}}
-{"timestamp":"2026-08-29T16:17:37+00:00","level":"info","message":"request_completed","context":{"request_id":"1058667b6cbdacde","status":200,"endpoint":"api_hello","latency_ms":2}}
-{"timestamp":"2026-08-29T16:17:38+00:00","level":"info","message":"request_received","context":{"request_id":"b5ccc0381ceea624","method":"HEAD","path":"/api/hello"}}
-{"timestamp":"2026-08-29T16:17:38+00:00","level":"info","message":"request_completed","context":{"request_id":"b5ccc0381ceea624","status":200,"endpoint":"api_hello","latency_ms":7}}

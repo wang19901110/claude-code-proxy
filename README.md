@@ -4,18 +4,7 @@
 
 ## 准备
 
-电脑需要先安装并配置到 `PATH`：
-
-- PHP 8.1 或更高版本
-- Composer（首次启动时自动安装 PHP 依赖）
-- Claude Code Desktop
-
-可在 PowerShell 中检查：
-
-```powershell
-php -v
-composer --version
-```
+项目已内置 PHP 8.3.2 与 Workerman 依赖；只需要 Windows 和 Claude Code Desktop。Composer 仅在 `vendor` 被手动删除后才需要用于恢复依赖。
 
 ## 1. 创建 B.AI API Key
 
@@ -28,7 +17,7 @@ composer --version
 
 ## 2. 填写 Key
 
-打开 `_bai\.env`，填写：
+打开 `b.ai\.env`，填写：
 
 ```ini
 BAI_API_KEY=你的 B.AI API Key
@@ -40,7 +29,7 @@ BAI_API_KEY=你的 B.AI API Key
 
 在资源管理器中直接双击：
 
-[`_bai\start_proxy.bat`](./_bai/start_proxy.bat)
+[`b.ai\start-proxy.bat`](./b.ai/start-proxy.bat)
 
 窗口显示下面内容即表示启动成功：
 
@@ -76,10 +65,8 @@ Starting B.AI Claude Desktop local proxy at http://127.0.0.1:8787
 当前代理提供以下 B.AI 模型：
 
 - `deepseek-v4-flash`
-- `glm-5.3-flash`
 - `qwen3.8-flash`
 - `hy3`
-- `mimo-v2.5`
 
 免费活动和模型可用性以 B.AI 页面为准。
 
@@ -89,4 +76,4 @@ Starting B.AI Claude Desktop local proxy at http://127.0.0.1:8787
 - 推理超时：访问 <http://127.0.0.1:8787/health>；无法打开表示代理未启动。
 - `403 access_denied`：到 [https://chat.b.ai/key](https://chat.b.ai/key) 检查 Key 权限或模型是否仍免费。
 
-`.env` 含有 B.AI Key，不要上传、分享或截图。
+`.env` 含有 B.AI Key，不要上传、分享或截图。项目结构为：`b.ai/`（代理源码、配置与日志）、`php8.3.2nts/`（PHP 运行时）、`vendor/`（PHP 依赖）。

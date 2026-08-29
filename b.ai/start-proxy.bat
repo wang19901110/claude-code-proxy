@@ -1,13 +1,14 @@
 @echo off
 setlocal EnableExtensions
 
-cd /d "%~dp0"
+set "SCRIPT_DIR=%~dp0"
+for %%I in ("%SCRIPT_DIR%..") do set "PROJECT_ROOT=%%~fI"
+cd /d "%SCRIPT_DIR%"
 title B.AI Claude Desktop Local Proxy
 
-where php >nul 2>nul
-if errorlevel 1 (
-  echo [ERROR] PHP was not found in PATH.
-  echo Install PHP 8.1+ or add php.exe to PATH, then run this file again.
+if not exist "%PROJECT_ROOT%\php8.3.2nts\php.exe" (
+  echo [ERROR] Bundled PHP runtime was not found.
+  echo Expected: %PROJECT_ROOT%\php8.3.2nts\php.exe
   pause
   exit /b 1
 )
@@ -33,16 +34,17 @@ if not defined BAI_API_KEY (
   exit /b 1
 )
 
-if not exist "vendor\autoload.php" (
+if not exist "%PROJECT_ROOT%\vendor\autoload.php" (
   where composer >nul 2>nul
   if errorlevel 1 (
-    echo [ERROR] Composer was not found and vendor\autoload.php is missing.
+    echo [ERROR] Composer was not found and %PROJECT_ROOT%\vendor\autoload.php is missing.
     echo Install Composer or run composer install in this folder.
     pause
     exit /b 1
   )
   echo Installing PHP dependencies...
-  composer install --no-interaction --prefer-dist
+  set "COMPOSER_VENDOR_DIR=%PROJECT_ROOT%\vendor"
+  composer install --working-dir="%SCRIPT_DIR%" --no-interaction --prefer-dist
   if errorlevel 1 (
     echo [ERROR] Composer install failed.
     pause
@@ -58,7 +60,7 @@ echo Keep this window open while Claude Desktop uses the proxy.
 echo Press Ctrl+C to stop it.
 echo.
 
-php8.3.2nts\php.exe proxy.php start
+"%PROJECT_ROOT%\php8.3.2nts\php.exe" "%SCRIPT_DIR%proxy.php" start
 set "EXIT_CODE=%ERRORLEVEL%"
 
 echo.
