@@ -7,10 +7,13 @@ $baseDir = dirname($vendorDir);
 
 return array(
     'ClaudeCodeProxy\\AnthropicResponseAdapter' => $baseDir . '/src/AnthropicResponseAdapter.php',
+    'ClaudeCodeProxy\\AnthropicToOpenAITransformer' => $baseDir . '/src/AnthropicToOpenAITransformer.php',
+    'ClaudeCodeProxy\\OpenAIChatResponseAdapter' => $baseDir . '/src/OpenAIChatResponseAdapter.php',
     'ClaudeCodeProxy\\ProviderInterface' => $baseDir . '/src/ProviderInterface.php',
     'ClaudeCodeProxy\\ProviderRegistry' => $baseDir . '/src/ProviderRegistry.php',
     'ClaudeCodeProxy\\ProxyLogger' => $baseDir . '/src/ProxyLogger.php',
     'ClaudeCodeProxy\\ProxyServer' => $baseDir . '/src/ProxyServer.php',
+    'ClaudeCodeProxy\\ResponseAdapterInterface' => $baseDir . '/src/ResponseAdapterInterface.php',
     'Composer\\InstalledVersions' => $vendorDir . '/composer/InstalledVersions.php',
     'Psr\\Http\\Message\\MessageInterface' => $vendorDir . '/psr/http-message/src/MessageInterface.php',
     'Psr\\Http\\Message\\RequestInterface' => $vendorDir . '/psr/http-message/src/RequestInterface.php',

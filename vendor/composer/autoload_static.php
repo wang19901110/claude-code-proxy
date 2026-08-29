@@ -58,10 +58,13 @@ class ComposerStaticInit4226b1279fe4cb37e1f45fceccc74bc0
 
     public static $classMap = array (
         'ClaudeCodeProxy\\AnthropicResponseAdapter' => __DIR__ . '/../..' . '/src/AnthropicResponseAdapter.php',
+        'ClaudeCodeProxy\\AnthropicToOpenAITransformer' => __DIR__ . '/../..' . '/src/AnthropicToOpenAITransformer.php',
+        'ClaudeCodeProxy\\OpenAIChatResponseAdapter' => __DIR__ . '/../..' . '/src/OpenAIChatResponseAdapter.php',
         'ClaudeCodeProxy\\ProviderInterface' => __DIR__ . '/../..' . '/src/ProviderInterface.php',
         'ClaudeCodeProxy\\ProviderRegistry' => __DIR__ . '/../..' . '/src/ProviderRegistry.php',
         'ClaudeCodeProxy\\ProxyLogger' => __DIR__ . '/../..' . '/src/ProxyLogger.php',
         'ClaudeCodeProxy\\ProxyServer' => __DIR__ . '/../..' . '/src/ProxyServer.php',
+        'ClaudeCodeProxy\\ResponseAdapterInterface' => __DIR__ . '/../..' . '/src/ResponseAdapterInterface.php',
         'Composer\\InstalledVersions' => __DIR__ . '/..' . '/composer/InstalledVersions.php',
         'Psr\\Http\\Message\\MessageInterface' => __DIR__ . '/..' . '/psr/http-message/src/MessageInterface.php',
         'Psr\\Http\\Message\\RequestInterface' => __DIR__ . '/..' . '/psr/http-message/src/RequestInterface.php',

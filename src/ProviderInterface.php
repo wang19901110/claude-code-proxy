@@ -45,5 +45,5 @@ interface ProviderInterface
     public function prepareRequest(array $payload, array $model, Request $request): array;
 
     /** @param array<string, mixed> $model */
-    public function responseAdapter(array $model, string $clientModel): AnthropicResponseAdapter;
+    public function responseAdapter(array $model, string $clientModel): ResponseAdapterInterface;
 }

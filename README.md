@@ -11,12 +11,26 @@
 | B.AI | `claude-sonnet-4-6` | `deepseek-v4-flash` | 32000 |
 | B.AI | `claude-opus-4-6` | `qwen3.8-flash` | 64000 |
 | B.AI | `claude-opus-4-5` | `hy3` | 32000 |
+| Groq | `groq-qwen3.8-27b` | `qwen/qwen3.8-27b` | 16384 |
+| Groq | `groq-gpt-oss-120b` | `openai/gpt-oss-120b` | 65536 |
+| SiliconFlow | `siliconflow-qwen3-8b` | `Qwen/Qwen3-8B` | 16384 |
+| SiliconFlow | `siliconflow-qwen2.5-7b` | `Qwen/Qwen2.5-7B-Instruct` | 16384 |
 
-普通请求的 `max_tokens` 由 Provider 按上表设置。Claude Code Desktop 的探测请求传入 `1` 或 `2` 时，B.AI Provider 会改为 `16`。
+普通请求的 `max_tokens` 由 Provider 按上表设置。Claude Code Desktop 的探测请求传入 `1` 或 `2` 时，各 Provider 会改为 `16`。
 
-## 配置 B.AI
+Groq 使用无需绑定信用卡的 Free Plan；SiliconFlow 仅配置价格为 0、名称不带 `Pro/` 的免费模型。两者仍受平台正常的公平使用速率限制，但不依赖付费套餐或短期试用额度。
 
-复制配置模板：
+## 配置 Provider
+
+每个平台在自己的目录中保存注册说明、Key 地址和独立 `.env`：
+
+| Provider | 配置文档 |
+| --- | --- |
+| B.AI | [providers/b_ai/README.md](providers/b_ai/README.md) |
+| Groq | [providers/groq/README.md](providers/groq/README.md) |
+| SiliconFlow | [providers/siliconflow/README.md](providers/siliconflow/README.md) |
+
+以 B.AI 为例，复制配置模板：
 
 ```powershell
 Copy-Item .\providers\b_ai\.env.example .\providers\b_ai\.env
@@ -99,6 +113,8 @@ config.php             # 非敏感代理配置
 start.bat              # Windows 启动脚本
 src/                   # 通用路由、协议、日志与 Provider 注册
 providers/b_ai/        # B.AI 实现与独立配置
+providers/groq/        # Groq 实现与独立配置
+providers/siliconflow/ # SiliconFlow 实现与独立配置
 php8.3.2nts/           # PHP 运行时
 vendor/                # Composer 依赖
 tests/run.php          # 无额外依赖的回归测试

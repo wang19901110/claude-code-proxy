@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace ClaudeCodeProxy;
 
-final class AnthropicResponseAdapter
+final class AnthropicResponseAdapter implements ResponseAdapterInterface
 {
     public function __construct(
         private readonly string $clientModel,

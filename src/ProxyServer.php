@@ -249,7 +249,7 @@ final class ProxyServer
         Client $client,
         $connection,
         array $upstream,
-        AnthropicResponseAdapter $adapter,
+        ResponseAdapterInterface $adapter,
         string $providerId,
         string $requestId,
         string $requestedModel,
@@ -366,7 +366,7 @@ final class ProxyServer
                         'stream' => true,
                         'stream_bytes' => $streamBytes,
                         'stream_chunks' => $streamChunks,
-                        'error' => $exception->getMessage(),
+                        'error_type' => get_debug_type($exception),
                         'latency_ms' => self::latencyMs($startedAt),
                     ]);
                 },
@@ -380,7 +380,7 @@ final class ProxyServer
                 'requested_model' => $requestedModel,
                 'upstream_model' => $upstreamModel,
                 'stream' => true,
-                'error' => $exception->getMessage(),
+                'error_type' => get_debug_type($exception),
                 'latency_ms' => self::latencyMs($startedAt),
             ]);
         }
@@ -391,7 +391,7 @@ final class ProxyServer
         Client $client,
         $connection,
         array $upstream,
-        AnthropicResponseAdapter $adapter,
+        ResponseAdapterInterface $adapter,
         string $providerId,
         string $requestId,
         string $requestedModel,
@@ -446,7 +446,7 @@ final class ProxyServer
                         'requested_model' => $requestedModel,
                         'upstream_model' => $upstreamModel,
                         'stream' => false,
-                        'error' => $exception->getMessage(),
+                        'error_type' => get_debug_type($exception),
                         'latency_ms' => self::latencyMs($startedAt),
                     ]);
                 },
@@ -459,7 +459,7 @@ final class ProxyServer
                 'requested_model' => $requestedModel,
                 'upstream_model' => $upstreamModel,
                 'stream' => false,
-                'error' => $exception->getMessage(),
+                'error_type' => get_debug_type($exception),
                 'latency_ms' => self::latencyMs($startedAt),
             ]);
         }

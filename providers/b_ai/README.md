@@ -2,6 +2,13 @@
 
 这个 Provider 将 Claude Code Desktop 的 Anthropic Messages 请求转发到 B.AI。
 
+## 注册与 API Key
+
+- 注册/登录：https://chat.b.ai/
+- 创建 API Key：https://chat.b.ai/key
+
+B.AI 当前免费模型和活动规则可能变化，请以 Key 页面显示为准；本项目不会读取或保存平台登录密码。
+
 ## 配置
 
 复制 `.env.example` 为 `.env`，然后填写：
