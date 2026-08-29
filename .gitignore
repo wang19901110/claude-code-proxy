@@ -1,0 +1,11 @@
+# Local secrets and runtime files
+_bai/.env
+_bai/workerman.log
+_bai/runtime/
+
+# Installed PHP dependencies (recreated with composer install)
+_bai/vendor/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db

@@ -1,0 +1,13 @@
+{
+  "name": "local/bai-claude-desktop-proxy",
+  "description": "A loopback-only Workerman proxy that maps Claude Desktop model aliases to B.AI models.",
+  "type": "project",
+  "require": {
+    "php": "^8.1",
+    "workerman/workerman": "^5.1",
+    "workerman/http-client": "^3.0"
+  },
+  "config": {
+    "sort-packages": true
+  }
+}
