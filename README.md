@@ -79,7 +79,7 @@ Starting B.AI Claude Desktop local proxy at http://127.0.0.1:8787
 - `glm-5.3-flash`
 - `qwen3.8-flash`
 - `hy3`
-- `deepseek-v4-flash-vision-exp`
+- `mimo-v2.5`
 
 免费活动和模型可用性以 B.AI 页面为准。
 

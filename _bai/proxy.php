@@ -59,7 +59,7 @@ function model_map(): array
         'claude-haiku-4-5' => 'glm-5.3-flash',
         'claude-opus-4-6' => 'qwen3.8-flash',
         'claude-opus-4-5' => 'hy3',
-        'claude-sonnet-4-5' => 'deepseek-v4-flash-vision-exp',
+        'claude-sonnet-4-5' => 'mimo-v2.5',
     ];
 }
 
@@ -67,10 +67,10 @@ function model_map(): array
 function legacy_model_map(): array
 {
     // Keep previously advertised descriptive aliases working for direct callers,
-    // but do not expose them to Desktop model discovery.
-    return [
+        // but do not expose them to Desktop model discovery.
+        return [
         'claude-opus_deepseek-v4-flash' => 'deepseek-v4-flash',
-        'claude-opus_deepseek-v4-flash-vision-exp' => 'deepseek-v4-flash-vision-exp',
+        'claude-opus_mimo-v2.5' => 'mimo-v2.5',
         'claude-opus_hy3' => 'hy3',
         'claude-opus_glm-5.3-flash' => 'glm-5.3-flash',
         'claude-opus_qwen3.8-flash' => 'qwen3.8-flash',
