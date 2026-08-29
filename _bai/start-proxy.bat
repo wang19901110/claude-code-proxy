@@ -52,11 +52,13 @@ if not exist "vendor\autoload.php" (
 
 echo.
 echo Starting B.AI Claude Desktop local proxy at http://127.0.0.1:8787
+echo This window shows safe request and response summaries in real time.
+echo Request logs are appended to %CD%\workerman.log
 echo Keep this window open while Claude Desktop uses the proxy.
 echo Press Ctrl+C to stop it.
 echo.
 
-php proxy.php start
+php8.3.2nts\php.exe proxy.php start
 set "EXIT_CODE=%ERRORLEVEL%"
 
 echo.

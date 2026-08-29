@@ -56,10 +56,18 @@ function model_map(): array
         // Claude Desktop only accepts these known Claude-style model IDs in its
         // discovery picker. Their upstream destination remains visible at /health.
         'claude-sonnet-4-6' => 'deepseek-v4-flash',
-        'claude-haiku-4-5' => 'glm-5.3-flash',
         'claude-opus-4-6' => 'qwen3.8-flash',
         'claude-opus-4-5' => 'hy3',
-        'claude-sonnet-4-5' => 'mimo-v2.5',
+    ];
+}
+
+/** @return array<string, int> */
+function model_max_tokens(): array
+{
+    return [
+        'deepseek-v4-flash' => 32000,
+        'qwen3.8-flash' => 64000,
+        'hy3' => 32000,
     ];
 }
 
@@ -70,9 +78,7 @@ function legacy_model_map(): array
         // but do not expose them to Desktop model discovery.
         return [
         'claude-opus_deepseek-v4-flash' => 'deepseek-v4-flash',
-        'claude-opus_mimo-v2.5' => 'mimo-v2.5',
         'claude-opus_hy3' => 'hy3',
-        'claude-opus_glm-5.3-flash' => 'glm-5.3-flash',
         'claude-opus_qwen3.8-flash' => 'qwen3.8-flash',
     ];
 }
@@ -93,14 +99,14 @@ function requested_model_alias(string $model): string
     return $model;
 }
 
-function upstream_model(string $requestedModel, array $config): ?string
+function upstream_model(string $requestedModel): ?string
 {
     foreach (routing_model_map() as $alias => $upstream) {
         if (normalize_model($alias) === normalize_model($requestedModel)) {
             return $upstream;
         }
     }
-    return $config['allow_unknown_models'] ? $config['default_upstream_model'] : null;
+    return null;
 }
 
 function json_response(int $status, array $body): Response
@@ -114,6 +120,85 @@ function json_response(int $status, array $body): Response
 function error_response(int $status, string $type, string $message): Response
 {
     return json_response($status, ['type' => 'error', 'error' => ['type' => $type, 'message' => $message]]);
+}
+
+function proxy_log(string $level, string $message, array $context = []): void
+{
+    $entry = [
+        'timestamp' => date(DATE_ATOM),
+        'level' => $level,
+        'message' => $message,
+        'context' => $context,
+    ];
+    $line = json_encode($entry, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($line !== false) {
+        @file_put_contents(__DIR__ . '/workerman.log', $line . PHP_EOL, FILE_APPEND | LOCK_EX);
+    }
+    proxy_console_log($level, $message, $context);
+}
+
+function reset_proxy_log(): void
+{
+    file_put_contents(__DIR__ . '/workerman.log', '', LOCK_EX);
+}
+
+function proxy_console_log(string $level, string $message, array $context): void
+{
+    // Claude Desktop polls count_tokens frequently. Keep it in the JSON log but
+    // do not flood the interactive console with those inexpensive local probes.
+    if (($context['path'] ?? '') === '/v1/messages/count_tokens' || ($context['endpoint'] ?? '') === 'count_tokens') {
+        return;
+    }
+
+    $time = date('H:i:s');
+    $requestId = $context['request_id'] ?? '-';
+    $line = null;
+
+    if ($message === 'proxy_started') {
+        $line = sprintf(
+            '[%s] [INFO] Proxy ready on http://%s:%d with %d models',
+            $time,
+            $context['host'] ?? '127.0.0.1',
+            $context['port'] ?? 0,
+            $context['model_count'] ?? 0,
+        );
+    } elseif ($message === 'request_received' && in_array($context['path'] ?? '', ['/v1/messages', '/v1/models'], true)) {
+        $line = sprintf('[%s] [REQUEST] %s %s id=%s', $time, $context['method'] ?? '?', $context['path'], $requestId);
+    } elseif ($message === 'forwarding_request') {
+        $line = sprintf(
+            '[%s] [FORWARD] id=%s %s -> %s %s max_tokens=%s',
+            $time,
+            $requestId,
+            $context['requested_model'] ?? '?',
+            $context['upstream_model'] ?? '?',
+            ($context['stream'] ?? false) ? 'SSE' : 'JSON',
+            $context['max_tokens'] ?? '?',
+        );
+    } elseif (in_array($message, ['upstream_response', 'upstream_error'], true)) {
+        $bytes = ($context['stream'] ?? false)
+            ? ($context['stream_bytes'] ?? 0)
+            : ($context['response_bytes'] ?? 0);
+        $suffix = !empty($context['sse_repaired']) ? ' repaired_sse=yes' : '';
+        $error = $context['error_type'] ?? ($context['error'] ?? '');
+        $line = sprintf(
+            '[%s] [%s] id=%s model=%s status=%s latency=%sms bytes=%s%s%s',
+            $time,
+            $message === 'upstream_error' || $level === 'error' ? 'ERROR' : strtoupper($level),
+            $requestId,
+            $context['upstream_model'] ?? '?',
+            $context['status'] ?? '-',
+            $context['latency_ms'] ?? '-',
+            $bytes,
+            $suffix,
+            $error === '' ? '' : ' error=' . $error,
+        );
+    } elseif ($message === 'request_completed' && ($context['status'] ?? 200) >= 400) {
+        $line = sprintf('[%s] [WARN] id=%s request completed with HTTP %s', $time, $requestId, $context['status']);
+    }
+
+    if ($line !== null) {
+        fwrite(STDOUT, $line . PHP_EOL);
+    }
 }
 
 function replace_model_value(mixed $value, string $clientModel): mixed
@@ -145,9 +230,66 @@ function rewrite_json_model(string $json, string $clientModel): string
 
 /**
  * Client progress callbacks may split a single SSE event across byte chunks.
- * Keep the incomplete tail and only rewrite complete SSE records.
+ * Keep the incomplete tail, rewrite complete SSE records, and track whether
+ * upstream emitted the terminal Anthropic events expected by Claude Desktop.
  */
-function rewrite_sse_buffer(string &$pending, string $incoming, string $clientModel): string
+function track_sse_payload(string $payload, array &$state): void
+{
+    $decoded = json_decode($payload, true);
+    if (!is_array($decoded)) {
+        return;
+    }
+
+    $type = $decoded['type'] ?? '';
+    if ($type === 'message_start') {
+        $state['message_started'] = true;
+        return;
+    }
+    if ($type === 'message_stop') {
+        $state['message_stopped'] = true;
+        return;
+    }
+
+    $index = $decoded['index'] ?? null;
+    if (!is_int($index) && !is_numeric($index)) {
+        return;
+    }
+    $key = (string) $index;
+    if ($type === 'content_block_start') {
+        $state['open_blocks'][$key] = (int) $index;
+    } elseif ($type === 'content_block_stop') {
+        unset($state['open_blocks'][$key]);
+    }
+}
+
+function complete_sse_stream(array &$state): string
+{
+    if (!$state['message_started'] || $state['message_stopped']) {
+        return '';
+    }
+
+    $output = '';
+    foreach (array_reverse(array_values($state['open_blocks'])) as $index) {
+        $output .= 'event: content_block_stop' . "\n" . 'data: ' . json_encode([
+            'type' => 'content_block_stop',
+            'index' => $index,
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n\n";
+    }
+    $output .= 'event: message_delta' . "\n" . 'data: ' . json_encode([
+        'type' => 'message_delta',
+        'delta' => ['stop_reason' => 'end_turn', 'stop_sequence' => null],
+        'usage' => ['output_tokens' => 0],
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n\n";
+    $output .= 'event: message_stop' . "\n" . 'data: ' . json_encode([
+        'type' => 'message_stop',
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n\n";
+
+    $state['open_blocks'] = [];
+    $state['message_stopped'] = true;
+    return $output;
+}
+
+function rewrite_sse_buffer(string &$pending, string $incoming, string $clientModel, array &$state): string
 {
     $pending .= $incoming;
     $output = '';
@@ -166,6 +308,7 @@ function rewrite_sse_buffer(string &$pending, string $incoming, string $clientMo
             $prefix = substr($line, 0, 5);
             $payload = ltrim(substr($line, 5));
             if ($payload !== '' && $payload !== '[DONE]') {
+                track_sse_payload($payload, $state);
                 $line = $prefix . ' ' . rewrite_json_model($payload, $clientModel);
             }
         }
@@ -189,8 +332,6 @@ $config = [
     'bai_api_key' => env_value($env, 'BAI_API_KEY'),
     'host' => env_value($env, 'PROXY_HOST', '127.0.0.1'),
     'port' => (int) env_value($env, 'PROXY_PORT', '8787'),
-    'default_upstream_model' => env_value($env, 'DEFAULT_UPSTREAM_MODEL', 'deepseek-v4-flash'),
-    'allow_unknown_models' => filter_var(env_value($env, 'ALLOW_UNKNOWN_MODELS', 'true'), FILTER_VALIDATE_BOOL),
     'upstream_timeout' => (int) env_value($env, 'UPSTREAM_TIMEOUT', '180'),
 ];
 
@@ -213,6 +354,14 @@ $worker->onWorkerStart = static function () use ($config): void {
 $worker->onMessage = static function ($connection, Request $request) use ($config): void {
     $path = $request->path();
     $method = strtoupper($request->method());
+    $requestId = bin2hex(random_bytes(8));
+    $startedAt = microtime(true);
+
+    proxy_log('info', 'request_received', [
+        'request_id' => $requestId,
+        'method' => $method,
+        'path' => $path,
+    ]);
 
     if ($method === 'OPTIONS') {
         $connection->send(new Response(204, [
@@ -220,6 +369,11 @@ $worker->onMessage = static function ($connection, Request $request) use ($confi
             'Access-Control-Allow-Headers' => 'Authorization, Content-Type, X-Api-Key, Anthropic-Version, Anthropic-Beta',
             'Access-Control-Allow-Methods' => 'GET, POST, OPTIONS',
         ]));
+        proxy_log('info', 'request_completed', [
+            'request_id' => $requestId,
+            'status' => 204,
+            'latency_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+        ]);
         return;
     }
 
@@ -228,8 +382,32 @@ $worker->onMessage = static function ($connection, Request $request) use ($confi
             'status' => 'ok',
             'upstream' => 'https://api.b.ai/v1/messages',
             'models' => model_map(),
-            'default_upstream_model' => $config['default_upstream_model'],
         ]));
+        proxy_log('info', 'request_completed', [
+            'request_id' => $requestId,
+            'status' => 200,
+            'latency_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+        ]);
+        return;
+    }
+
+    if (in_array($method, ['GET', 'POST', 'HEAD'], true) && $path === '/api/hello') {
+        // Claude Code Desktop probes this endpoint with HEAD before normal API calls.
+        // HEAD must confirm availability without sending a response body.
+        $connection->send($method === 'HEAD'
+            ? new Response(200, ['Content-Type' => 'application/json; charset=utf-8'])
+            : json_response(200, [
+                'status' => 'ok',
+                'service' => 'local-bai-proxy',
+                'model_count' => count(model_map()),
+            ])
+        );
+        proxy_log('info', 'request_completed', [
+            'request_id' => $requestId,
+            'status' => 200,
+            'endpoint' => 'api_hello',
+            'latency_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+        ]);
         return;
     }
 
@@ -247,38 +425,80 @@ $worker->onMessage = static function ($connection, Request $request) use ($confi
             ];
         }
         $connection->send(json_response(200, ['object' => 'list', 'data' => $models]));
+        proxy_log('info', 'request_completed', [
+            'request_id' => $requestId,
+            'status' => 200,
+            'model_count' => count($models),
+            'latency_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+        ]);
         return;
     }
 
     if ($method !== 'POST' || !in_array($path, ['/v1/messages', '/v1/messages/count_tokens'], true)) {
-        $connection->send(error_response(404, 'not_found_error', 'Only /v1/messages, /v1/messages/count_tokens, /v1/models, and /health are available.'));
+        $connection->send(error_response(404, 'not_found_error', 'Only /v1/messages, /v1/messages/count_tokens, /v1/models, /health, and /api/hello are available.'));
+        proxy_log('warning', 'request_completed', [
+            'request_id' => $requestId,
+            'status' => 404,
+            'latency_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+        ]);
         return;
     }
 
     $payload = json_decode($request->rawBody(), true);
     if (!is_array($payload)) {
         $connection->send(error_response(400, 'invalid_request_error', 'The request body must be valid JSON.'));
+        proxy_log('warning', 'request_completed', [
+            'request_id' => $requestId,
+            'status' => 400,
+            'error_type' => 'invalid_json',
+            'latency_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+        ]);
         return;
     }
 
     if ($path === '/v1/messages/count_tokens') {
         $connection->send(json_response(200, ['input_tokens' => count_tokens_locally($payload)]));
+        proxy_log('info', 'request_completed', [
+            'request_id' => $requestId,
+            'status' => 200,
+            'endpoint' => 'count_tokens',
+            'latency_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+        ]);
         return;
     }
 
     if ($config['bai_api_key'] === '') {
         $connection->send(error_response(500, 'api_error', 'BAI_API_KEY is not configured in the local .env file.'));
+        proxy_log('error', 'request_completed', [
+            'request_id' => $requestId,
+            'status' => 500,
+            'error_type' => 'missing_api_key',
+            'latency_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+        ]);
         return;
     }
 
     $requestedModel = (string) ($payload['model'] ?? '');
     if ($requestedModel === '') {
         $connection->send(error_response(400, 'invalid_request_error', 'model is required.'));
+        proxy_log('warning', 'request_completed', [
+            'request_id' => $requestId,
+            'status' => 400,
+            'error_type' => 'missing_model',
+            'latency_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+        ]);
         return;
     }
-    $upstreamModel = upstream_model($requestedModel, $config);
+    $upstreamModel = upstream_model($requestedModel);
     if ($upstreamModel === null) {
         $connection->send(error_response(400, 'invalid_request_error', 'This model alias is not mapped by the local proxy.'));
+        proxy_log('warning', 'request_completed', [
+            'request_id' => $requestId,
+            'status' => 400,
+            'requested_model' => $requestedModel,
+            'error_type' => 'unmapped_model',
+            'latency_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+        ]);
         return;
     }
 
@@ -286,17 +506,35 @@ $worker->onMessage = static function ($connection, Request $request) use ($confi
     $payload['model'] = $upstreamModel;
 
     // Claude Desktop's gateway health check may use max_tokens=1 or 2. B.AI
-    // requires a value greater than 2, so make only these probe-sized requests
-    // valid upstream. Normal user-selected limits pass through unchanged.
+    // requires a value greater than 2, so retain a small probe budget in that case.
+    // Normal requests use the explicit per-model limits above, independent of the
+    // value supplied by the Desktop client.
     $requestedMaxTokens = isset($payload['max_tokens']) ? (int) $payload['max_tokens'] : 0;
     if ($requestedMaxTokens <= 2) {
         $payload['max_tokens'] = 16;
+    } else {
+        $payload['max_tokens'] = model_max_tokens()[$upstreamModel];
     }
 
     $stream = (bool) ($payload['stream'] ?? false);
+    proxy_log('info', 'forwarding_request', [
+        'request_id' => $requestId,
+        'requested_model' => $requestedModel,
+        'upstream_model' => $upstreamModel,
+        'stream' => $stream,
+        'requested_max_tokens' => $requestedMaxTokens,
+        'max_tokens' => $payload['max_tokens'] ?? null,
+    ]);
     $requestBody = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     if ($requestBody === false) {
         $connection->send(error_response(400, 'invalid_request_error', 'Unable to encode the request body.'));
+        proxy_log('warning', 'request_completed', [
+            'request_id' => $requestId,
+            'status' => 400,
+            'requested_model' => $requestedModel,
+            'error_type' => 'json_encode_failed',
+            'latency_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+        ]);
         return;
     }
 
@@ -324,29 +562,87 @@ $worker->onMessage = static function ($connection, Request $request) use ($confi
         ], ''));
 
         $pending = '';
+        $streamBytes = 0;
+        $streamChunks = 0;
+        $sseState = [
+            'message_started' => false,
+            'message_stopped' => false,
+            'open_blocks' => [],
+        ];
         $http->request('https://api.b.ai/v1/messages', [
             'method' => 'POST',
             'headers' => $headers,
             'data' => $requestBody,
-            'progress' => static function (string $buffer) use ($connection, &$pending, $clientModel): void {
-                $rewritten = rewrite_sse_buffer($pending, $buffer, $clientModel);
+            'progress' => static function (string $buffer) use ($connection, &$pending, $clientModel, &$streamBytes, &$streamChunks, &$sseState): void {
+                $streamBytes += strlen($buffer);
+                $streamChunks++;
+                $rewritten = rewrite_sse_buffer($pending, $buffer, $clientModel, $sseState);
                 if ($rewritten !== '') {
                     $connection->send(new Chunk($rewritten));
                 }
             },
-            'success' => static function ($response) use ($connection, &$pending, $clientModel): void {
+            'success' => static function ($response) use ($connection, &$pending, $clientModel, $requestId, $requestedModel, $upstreamModel, $startedAt, &$streamBytes, &$streamChunks, &$sseState): void {
+                $status = $response->getStatusCode();
+                if ($status >= 400 || ($streamBytes === 0 && $pending === '')) {
+                    $message = $status >= 400
+                        ? 'Upstream returned HTTP ' . $status . '.'
+                        : 'Upstream returned an empty stream.';
+                    $event = 'event: error' . "\n" . 'data: ' . json_encode([
+                        'type' => 'error',
+                        'error' => ['type' => 'api_error', 'message' => $message],
+                    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n\n";
+                    $connection->send(new Chunk($event));
+                    $connection->send(new Chunk(''));
+                    proxy_log($status >= 400 ? 'warning' : 'error', 'upstream_response', [
+                        'request_id' => $requestId,
+                        'requested_model' => $requestedModel,
+                        'upstream_model' => $upstreamModel,
+                        'stream' => true,
+                        'status' => $status,
+                        'stream_bytes' => $streamBytes,
+                        'stream_chunks' => $streamChunks,
+                        'error_type' => $status >= 400 ? 'upstream_http_error' : 'empty_stream',
+                        'latency_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+                    ]);
+                    return;
+                }
                 if ($pending !== '') {
                     $connection->send(new Chunk(rewrite_json_model($pending, $clientModel)));
                 }
+                $repaired = complete_sse_stream($sseState);
+                if ($repaired !== '') {
+                    $connection->send(new Chunk($repaired));
+                }
                 $connection->send(new Chunk(''));
+                proxy_log('info', 'upstream_response', [
+                    'request_id' => $requestId,
+                    'requested_model' => $requestedModel,
+                    'upstream_model' => $upstreamModel,
+                    'stream' => true,
+                    'status' => $status,
+                    'stream_bytes' => $streamBytes,
+                    'stream_chunks' => $streamChunks,
+                    'sse_repaired' => $repaired !== '',
+                    'latency_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+                ]);
             },
-            'error' => static function (\Throwable $exception) use ($connection): void {
+            'error' => static function (\Throwable $exception) use ($connection, $requestId, $requestedModel, $upstreamModel, $startedAt, &$streamBytes, &$streamChunks): void {
                 $event = 'event: error' . "\n" . 'data: ' . json_encode([
                     'type' => 'error',
                     'error' => ['type' => 'api_error', 'message' => 'Upstream connection failed: ' . $exception->getMessage()],
                 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n\n";
                 $connection->send(new Chunk($event));
                 $connection->send(new Chunk(''));
+                proxy_log('error', 'upstream_error', [
+                    'request_id' => $requestId,
+                    'requested_model' => $requestedModel,
+                    'upstream_model' => $upstreamModel,
+                    'stream' => true,
+                    'stream_bytes' => $streamBytes,
+                    'stream_chunks' => $streamChunks,
+                    'error' => $exception->getMessage(),
+                    'latency_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+                ]);
             },
         ]);
         return;
@@ -356,17 +652,41 @@ $worker->onMessage = static function ($connection, Request $request) use ($confi
         'method' => 'POST',
         'headers' => $headers,
         'data' => $requestBody,
-        'success' => static function ($response) use ($connection, $clientModel): void {
+        'success' => static function ($response) use ($connection, $clientModel, $requestId, $requestedModel, $upstreamModel, $startedAt): void {
             $status = $response->getStatusCode();
             $body = (string) $response->getBody();
             $contentType = $response->getHeaderLine('Content-Type') ?: 'application/json; charset=utf-8';
             $connection->send(new Response($status, ['Content-Type' => $contentType], rewrite_json_model($body, $clientModel)));
+            proxy_log($status >= 400 ? 'warning' : 'info', 'upstream_response', [
+                'request_id' => $requestId,
+                'requested_model' => $requestedModel,
+                'upstream_model' => $upstreamModel,
+                'stream' => false,
+                'status' => $status,
+                'response_bytes' => strlen($body),
+                'latency_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+            ]);
         },
-        'error' => static function (\Throwable $exception) use ($connection): void {
+        'error' => static function (\Throwable $exception) use ($connection, $requestId, $requestedModel, $upstreamModel, $startedAt): void {
             $connection->send(error_response(502, 'api_error', 'Upstream connection failed: ' . $exception->getMessage()));
+            proxy_log('error', 'upstream_error', [
+                'request_id' => $requestId,
+                'requested_model' => $requestedModel,
+                'upstream_model' => $upstreamModel,
+                'stream' => false,
+                'error' => $exception->getMessage(),
+                'latency_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+            ]);
         },
     ]);
 };
 
+reset_proxy_log();
 fwrite(STDOUT, sprintf("B.AI Claude Desktop proxy listening on http://%s:%d\n", $config['host'], $config['port']));
+proxy_log('info', 'proxy_started', [
+    'host' => $config['host'],
+    'port' => $config['port'],
+    'model_count' => count(model_map()),
+    'upstream_timeout' => $config['upstream_timeout'],
+]);
 Worker::runAll();
