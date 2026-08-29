@@ -1,3 +1,2 @@
-# Private local API credentials. Do not commit these files.
-/.env
-/b.ai/.env
+/providers/*/.env
+/workerman.log

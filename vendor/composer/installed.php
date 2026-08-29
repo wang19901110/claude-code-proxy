@@ -1,19 +1,19 @@
 <?php return array(
     'root' => array(
-        'name' => 'local/bai-claude-desktop-proxy',
-        'pretty_version' => '1.0.0+no-version-set',
-        'version' => '1.0.0.0',
-        'reference' => NULL,
+        'name' => 'local/claude-code-proxy',
+        'pretty_version' => 'dev-main',
+        'version' => 'dev-main',
+        'reference' => '7ba859015ba31d9c309121f92d5a31685c1cdffa',
         'type' => 'project',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
         'dev' => true,
     ),
     'versions' => array(
-        'local/bai-claude-desktop-proxy' => array(
-            'pretty_version' => '1.0.0+no-version-set',
-            'version' => '1.0.0.0',
-            'reference' => NULL,
+        'local/claude-code-proxy' => array(
+            'pretty_version' => 'dev-main',
+            'version' => 'dev-main',
+            'reference' => '7ba859015ba31d9c309121f92d5a31685c1cdffa',
             'type' => 'project',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),

@@ -9,6 +9,7 @@ return array(
     'Workerman\\Psr7\\' => array($vendorDir . '/workerman/psr7/src'),
     'Workerman\\Http\\' => array($vendorDir . '/workerman/http-client/src'),
     'Workerman\\Coroutine\\' => array($vendorDir . '/workerman/coroutine/src'),
-    'Workerman\\' => array($vendorDir . '/workerman/workerman/src', $vendorDir . '/workerman/coroutine/src'),
+    'Workerman\\' => array($vendorDir . '/workerman/coroutine/src', $vendorDir . '/workerman/workerman/src'),
     'Psr\\Http\\Message\\' => array($vendorDir . '/psr/http-message/src'),
+    'ClaudeCodeProxy\\' => array($baseDir . '/src'),
 );

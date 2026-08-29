@@ -1,79 +1,117 @@
-# Claude Code Desktop 使用 B.AI 免费模型（Windows）
+# Claude Code Desktop 免费本地代理
 
-这是一个 PHP / Workerman 本地代理。Claude Code Desktop 连接本机代理，代理再调用 B.AI。
+这是一个面向 Claude Code Desktop 的可扩展本地代理。它在本机提供 Anthropic Messages 兼容接口，并通过独立 Provider 将请求转发到可用的免费模型平台。
 
-## 准备
+代理只监听 `127.0.0.1`，不会记录 API Key、提示词或回复正文。
 
-项目已内置 PHP 8.3.2 与 Workerman 依赖；只需要 Windows 和 Claude Code Desktop。Composer 仅在 `vendor` 被手动删除后才需要用于恢复依赖。
+## 当前 Provider
 
-## 1. 创建 B.AI API Key
+| Provider | Claude 模型别名 | 上游模型 | max_tokens |
+| --- | --- | --- | ---: |
+| B.AI | `claude-sonnet-4-6` | `deepseek-v4-flash` | 32000 |
+| B.AI | `claude-opus-4-6` | `qwen3.8-flash` | 64000 |
+| B.AI | `claude-opus-4-5` | `hy3` | 32000 |
 
-1. 打开 [https://chat.b.ai/chat](https://chat.b.ai/chat) 并登录。
-2. 打开 [https://chat.b.ai/key](https://chat.b.ai/key)。
-3. 点击“创建 API key”，选择“官方 / 全量接入”。
-4. 复制新 Key。
+普通请求的 `max_tokens` 由 Provider 按上表设置。Claude Code Desktop 的探测请求传入 `1` 或 `2` 时，B.AI Provider 会改为 `16`。
 
-![创建 B.AI API Key](./assets/bai-api-key.png)
+## 配置 B.AI
 
-## 2. 填写 Key
+复制配置模板：
 
-打开 `b.ai\.env`，填写：
-
-```ini
-BAI_API_KEY=你的 B.AI API Key
+```powershell
+Copy-Item .\providers\b_ai\.env.example .\providers\b_ai\.env
 ```
 
-如果 `.env` 不存在，直接执行下一步；启动脚本会自动创建并打开它。
+编辑 `providers\b_ai\.env`：
 
-## 3. 启动代理
+```dotenv
+BAI_API_KEY=你的_BAI_API_KEY
+UPSTREAM_TIMEOUT=180
+```
 
-在资源管理器中直接双击：
+真实 `.env` 已被 Git 忽略。不要把 Key 粘贴到日志、截图或聊天内容中。
 
-[`b.ai\start-proxy.bat`](./b.ai/start-proxy.bat)
+## 启动
 
-窗口显示下面内容即表示启动成功：
+双击 `start.bat`，或运行：
+
+```powershell
+.\start.bat
+```
+
+项目包含 PHP 8.3.2 和已安装的 Workerman 依赖。代理默认地址：
 
 ```text
-Starting B.AI Claude Desktop local proxy at http://127.0.0.1:8787
+http://127.0.0.1:8787
 ```
 
-保持这个窗口打开。关闭窗口或按 `Ctrl+C` 会停止代理。
+每次启动都会清空根目录的 `workerman.log`。黑色启动窗口会实时显示不含正文和 Key 的请求/响应摘要。
 
-## 4. 配置 Claude Code Desktop
+## Claude Code Desktop
 
-打开“配置第三方推理”→“连接”，按下表填写：
+在第三方推理服务中配置：
 
-| 字段 | 值 |
-| --- | --- |
-| Gateway 凭据类型 | `Static API key` |
-| Gateway 基础 URL | `http://127.0.0.1:8787` |
-| Gateway API 密钥 | 任意非空文本，例如 `local` |
-| Gateway 认证方案 | `x-api-key` |
-| Artifact preview iframe origin | 留空 |
-| 自定义推理请求头 | 留空 |
+```text
+Base URL: http://127.0.0.1:8787
+API Key: 任意非空文本，例如 local
+认证方式: x-api-key
+```
 
-![Gateway 连接配置](./assets/claude-desktop-gateway.png)
+模型发现接口只返回已配置 Provider 的模型。未映射模型返回 400，不会自动切换到其他平台。
 
-继续下滑到“模型”区域：
+## 接口
 
-1. 打开“模型发现”。
-2. 测试点击“测试模型发现”。
-3. 点击“应用更改”。
+| 方法 | 路径 | 用途 |
+| --- | --- | --- |
+| `GET` | `/health` | Provider 状态和模型数量 |
+| `GET` | `/v1/models` | 模型发现 |
+| `POST` | `/v1/messages` | Anthropic Messages 请求 |
+| `POST` | `/v1/messages/count_tokens` | 本地 token 估算 |
+| `GET/POST/HEAD` | `/api/hello` | Desktop 连通性探测 |
 
-![模型发现配置](./assets/claude-desktop-model-discovery.png)
+## 新增 Provider
 
-当前代理提供以下 B.AI 模型：
+在 `providers/<provider_id>/` 下创建：
 
-- `deepseek-v4-flash`
-- `qwen3.8-flash`
-- `hy3`
+```text
+ExampleProvider.php
+.env.example
+README.md
+```
 
-免费活动和模型可用性以 B.AI 页面为准。
+`ExampleProvider.php` 必须返回一个实现 `ClaudeCodeProxy\ProviderInterface` 的实例。代理会自动扫描 `providers/*/*Provider.php`，无需修改 HTTP 入口。
 
-## 出错时
+Provider 需要声明：
 
-- `found 0 models`：确认代理窗口仍开着，然后重启 Desktop 并重新测试模型发现。
-- 推理超时：访问 <http://127.0.0.1:8787/health>；无法打开表示代理未启动。
-- `403 access_denied`：到 [https://chat.b.ai/key](https://chat.b.ai/key) 检查 Key 权限或模型是否仍免费。
+- 小写 snake_case 平台 ID。
+- Claude 模型别名、上游模型和 `max_tokens`。
+- 配置状态和安全提示。
+- 上游地址、认证头和请求转换。
+- JSON/SSE 响应适配器。
 
-`.env` 含有 B.AI Key，不要上传、分享或截图。项目结构为：`b.ai/`（代理源码、配置与日志）、`php8.3.2nts/`（PHP 运行时）、`vendor/`（PHP 依赖）。
+重复平台 ID 或重复模型别名会使代理拒绝启动，避免静默覆盖路由。
+
+## 项目结构
+
+```text
+proxy.php              # 通用启动入口
+config.php             # 非敏感代理配置
+start.bat              # Windows 启动脚本
+src/                   # 通用路由、协议、日志与 Provider 注册
+providers/b_ai/        # B.AI 实现与独立配置
+php8.3.2nts/           # PHP 运行时
+vendor/                # Composer 依赖
+tests/run.php          # 无额外依赖的回归测试
+```
+
+运行测试：
+
+```powershell
+.\php8.3.2nts\php.exe .\tests\run.php
+```
+
+常见错误：
+
+- 没有可用模型：检查对应 Provider 目录中的 `.env`。
+- `429`：上游平台限流，稍后重试。
+- `502`：上游连接失败，检查网络和平台状态。
