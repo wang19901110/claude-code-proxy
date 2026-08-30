@@ -19,7 +19,9 @@ UPSTREAM_TIMEOUT=180
 
 | 本地模型别名 | Groq 上游模型 | max_tokens |
 | --- | --- | ---: |
-| `groq-qwen3.8-27b` | `qwen/qwen3.8-27b` | 16384 |
-| `groq-gpt-oss-120b` | `openai/gpt-oss-120b` | 65536 |
+| `claude-sonnet-3-1` | `qwen/qwen3.8-27b` | 16384 |
+| `claude-sonnet-3-2` | `openai/gpt-oss-120b` | 65536 |
+
+旧别名 `groq-qwen3.8-27b` 和 `groq-gpt-oss-120b` 仍可用于请求，但不会出现在模型发现列表中。
 
 Groq 使用 OpenAI Chat Completions；代理负责转换 Anthropic Messages、工具调用和 SSE 流。

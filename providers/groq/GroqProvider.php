@@ -44,16 +44,18 @@ final class GroqProvider implements ProviderInterface
     {
         return [
             [
-                'alias' => 'groq-qwen3.8-27b',
+                'alias' => 'claude-sonnet-3-1',
                 'upstream_model' => 'qwen/qwen3.8-27b',
                 'display_name' => 'Groq · Qwen3.8 27B',
                 'max_tokens' => 16384,
+                'legacy_aliases' => ['claude-groq-qwen3-8-27b', 'groq-qwen3.8-27b'],
             ],
             [
-                'alias' => 'groq-gpt-oss-120b',
+                'alias' => 'claude-sonnet-3-2',
                 'upstream_model' => 'openai/gpt-oss-120b',
                 'display_name' => 'Groq · GPT-OSS 120B',
                 'max_tokens' => 65536,
+                'legacy_aliases' => ['claude-groq-gpt-oss-120b', 'groq-gpt-oss-120b'],
             ],
         ];
     }

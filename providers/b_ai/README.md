@@ -24,8 +24,10 @@ UPSTREAM_TIMEOUT=180
 
 | Claude 模型别名 | B.AI 上游模型 | max_tokens |
 | --- | --- | ---: |
-| `claude-sonnet-4-6` | `deepseek-v4-flash` | 32000 |
-| `claude-opus-4-6` | `qwen3.8-flash` | 64000 |
-| `claude-opus-4-5` | `hy3` | 32000 |
+| `claude-sonnet-1-1` | `deepseek-v4-flash` | 32000 |
+| `claude-sonnet-1-2` | `qwen3.8-flash` | 64000 |
+| `claude-sonnet-1-3` | `hy3` | 32000 |
+
+旧 Claude 别名仍可用于请求，但不会出现在模型发现列表中。
 
 Hy3 偶尔遗漏 Anthropic SSE 结束事件；该平台实现会按需补齐结束事件。

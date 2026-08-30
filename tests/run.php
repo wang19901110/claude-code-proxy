@@ -61,6 +61,15 @@ $assert(count($registry->discoveryModels()) === 7, 'Exactly seven models are dis
 $assert($registry->routeFor('claude-sonnet-4-6') !== null, 'Known model route resolves.');
 $assert($registry->routeFor('groq-qwen3.8-27b') !== null, 'Groq model route resolves.');
 $assert($registry->routeFor('siliconflow-qwen3-8b') !== null, 'SiliconFlow model route resolves.');
+$assert($registry->routeFor('claude-groq-qwen3-8-27b') !== null, 'Claude-compatible Groq model route resolves.');
+$assert($registry->routeFor('claude-siliconflow-qwen3-8b') !== null, 'Claude-compatible SiliconFlow model route resolves.');
+$assert($registry->routeFor('claude-sonnet-1-1') !== null, 'B.AI discovery slot resolves.');
+$assert($registry->routeFor('claude-sonnet-2-1') !== null, 'SiliconFlow discovery slot resolves.');
+$assert($registry->routeFor('claude-sonnet-3-1') !== null, 'Groq discovery slot resolves.');
+$assert(count(array_filter(
+    $registry->discoveryModels(),
+    static fn (array $model): bool => preg_match('/^claude-sonnet-[1-9]-[1-9]$/', $model['alias']) === 1,
+)) === 7, 'All discovery aliases use Claude Desktop virtual slots.');
 $assert($registry->routeFor('unknown-model') === null, 'Unknown model route is rejected.');
 
 $request = new Request("POST /v1/messages HTTP/1.1\r\nHost: 127.0.0.1\r\nanthropic-version: 2023-06-01\r\n\r\n");
@@ -174,6 +183,16 @@ $siliconBody = json_decode($siliconPrepared['body'], true);
 $assert($siliconPrepared['endpoint'] === 'https://api.siliconflow.cn/v1/messages', 'SiliconFlow Anthropic endpoint is correct.');
 $assert($siliconBody['model'] === 'Qwen/Qwen3-8B', 'SiliconFlow upstream model is applied.');
 $assert($siliconBody['max_tokens'] === 16384, 'SiliconFlow max tokens are mapped.');
+$silicon35Prepared = $siliconFlow->prepareRequest([
+    'model' => 'claude-sonnet-2-2',
+    'max_tokens' => 100,
+    'stream' => false,
+    'messages' => [['role' => 'user', 'content' => 'test']],
+], $siliconFlow->models()[1], $request);
+$silicon35Body = json_decode($silicon35Prepared['body'], true);
+$assert($silicon35Body['model'] === 'Qwen/Qwen3.5-4B', 'SiliconFlow Qwen3.5 coding model is applied.');
+$assert($registry->routeFor('siliconflow-qwen2.5-7b') === null, 'Removed Qwen2.5 alias is not silently rerouted.');
+$assert($registry->routeFor('siliconflow-qwen3.5-4b') !== null, 'Qwen3.5 compatibility alias resolves.');
 $siliconJson = $siliconFlow->responseAdapter($siliconFlow->models()[0], 'siliconflow-qwen3-8b')
     ->rewriteJson('{"type":"message","model":"Qwen/Qwen3-8B","content":[]}');
 $assert(str_contains($siliconJson, '"model":"siliconflow-qwen3-8b"'), 'SiliconFlow response model is rewritten.');

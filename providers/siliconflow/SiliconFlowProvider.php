@@ -43,16 +43,18 @@ final class SiliconFlowProvider implements ProviderInterface
     {
         return [
             [
-                'alias' => 'siliconflow-qwen3-8b',
+                'alias' => 'claude-sonnet-2-1',
                 'upstream_model' => 'Qwen/Qwen3-8B',
                 'display_name' => 'SiliconFlow · Qwen3 8B Free',
                 'max_tokens' => 16384,
+                'legacy_aliases' => ['claude-siliconflow-qwen3-8b', 'siliconflow-qwen3-8b'],
             ],
             [
-                'alias' => 'siliconflow-qwen2.5-7b',
-                'upstream_model' => 'Qwen/Qwen2.5-7B-Instruct',
-                'display_name' => 'SiliconFlow · Qwen2.5 7B Free',
+                'alias' => 'claude-sonnet-2-2',
+                'upstream_model' => 'Qwen/Qwen3.5-4B',
+                'display_name' => 'SiliconFlow · Qwen3.5 4B Free',
                 'max_tokens' => 16384,
+                'legacy_aliases' => ['claude-siliconflow-qwen3-5-4b', 'siliconflow-qwen3.5-4b'],
             ],
         ];
     }

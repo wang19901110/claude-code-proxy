@@ -8,13 +8,13 @@
 
 | Provider | Claude 模型别名 | 上游模型 | max_tokens |
 | --- | --- | --- | ---: |
-| B.AI | `claude-sonnet-4-6` | `deepseek-v4-flash` | 32000 |
-| B.AI | `claude-opus-4-6` | `qwen3.8-flash` | 64000 |
-| B.AI | `claude-opus-4-5` | `hy3` | 32000 |
-| Groq | `groq-qwen3.8-27b` | `qwen/qwen3.8-27b` | 16384 |
-| Groq | `groq-gpt-oss-120b` | `openai/gpt-oss-120b` | 65536 |
-| SiliconFlow | `siliconflow-qwen3-8b` | `Qwen/Qwen3-8B` | 16384 |
-| SiliconFlow | `siliconflow-qwen2.5-7b` | `Qwen/Qwen2.5-7B-Instruct` | 16384 |
+| B.AI | `claude-sonnet-1-1` | `deepseek-v4-flash` | 32000 |
+| B.AI | `claude-sonnet-1-2` | `qwen3.8-flash` | 64000 |
+| B.AI | `claude-sonnet-1-3` | `hy3` | 32000 |
+| SiliconFlow | `claude-sonnet-2-1` | `Qwen/Qwen3-8B` | 16384 |
+| SiliconFlow | `claude-sonnet-2-2` | `Qwen/Qwen3.5-4B` | 16384 |
+| Groq | `claude-sonnet-3-1` | `qwen/qwen3.8-27b` | 16384 |
+| Groq | `claude-sonnet-3-2` | `openai/gpt-oss-120b` | 65536 |
 
 普通请求的 `max_tokens` 由 Provider 按上表设置。Claude Code Desktop 的探测请求传入 `1` 或 `2` 时，各 Provider 会改为 `16`。
 
@@ -73,6 +73,8 @@ API Key: 任意非空文本，例如 local
 
 模型发现接口只返回已配置 Provider 的模型。未映射模型返回 400，不会自动切换到其他平台。
 
+为兼容 Claude Code Desktop 的模型过滤规则，模型发现 ID 统一使用 `claude-sonnet-<平台编号>-<模型编号>`。旧别名仍可用于请求，但不会出现在发现列表中。
+
 ## 接口
 
 | 方法 | 路径 | 用途 |
@@ -98,7 +100,7 @@ README.md
 Provider 需要声明：
 
 - 小写 snake_case 平台 ID。
-- Claude 模型别名、上游模型和 `max_tokens`。
+- 符合 `claude-sonnet-<平台编号>-<模型编号>` 的唯一发现别名、上游模型和 `max_tokens`。
 - 配置状态和安全提示。
 - 上游地址、认证头和请求转换。
 - JSON/SSE 响应适配器。

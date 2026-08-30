@@ -126,14 +126,20 @@ final class ProxyServer
             foreach ($this->registry->discoveryModels() as $model) {
                 $models[] = [
                     'id' => $model['alias'],
-                    'object' => 'model',
-                    'owned_by' => $model['provider_id'],
+                    'type' => 'model',
+                    'created_at' => '1970-01-01T00:00:00Z',
                     'display_name' => $model['display_name'] ?? $model['upstream_model'],
-                    'upstream_model' => $model['upstream_model'],
-                    'provider' => $model['provider_id'],
+                    'max_input_tokens' => null,
+                    'max_tokens' => $model['max_tokens'],
+                    'capabilities' => null,
                 ];
             }
-            $connection->send($this->jsonResponse(200, ['object' => 'list', 'data' => $models]));
+            $connection->send($this->jsonResponse(200, [
+                'data' => $models,
+                'first_id' => $models[0]['id'] ?? null,
+                'has_more' => false,
+                'last_id' => $models === [] ? null : $models[array_key_last($models)]['id'],
+            ]));
             $this->logCompletion($requestId, 200, $startedAt, ['model_count' => count($models)]);
             return;
         }

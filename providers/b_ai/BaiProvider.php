@@ -49,27 +49,27 @@ final class BaiProvider implements ProviderInterface
     {
         return [
             [
-                'alias' => 'claude-sonnet-4-6',
+                'alias' => 'claude-sonnet-1-1',
                 'upstream_model' => 'deepseek-v4-flash',
-                'display_name' => 'deepseek-v4-flash',
+                'display_name' => 'B.AI · deepseek-v4-flash',
                 'max_tokens' => 32000,
-                'legacy_aliases' => ['claude-opus_deepseek-v4-flash'],
+                'legacy_aliases' => ['claude-sonnet-4-6', 'claude-opus_deepseek-v4-flash'],
                 'repair_incomplete_sse' => false,
             ],
             [
-                'alias' => 'claude-opus-4-6',
+                'alias' => 'claude-sonnet-1-2',
                 'upstream_model' => 'qwen3.8-flash',
-                'display_name' => 'qwen3.8-flash',
+                'display_name' => 'B.AI · qwen3.8-flash',
                 'max_tokens' => 64000,
-                'legacy_aliases' => ['claude-opus_qwen3.8-flash'],
+                'legacy_aliases' => ['claude-opus-4-6', 'claude-opus_qwen3.8-flash'],
                 'repair_incomplete_sse' => false,
             ],
             [
-                'alias' => 'claude-opus-4-5',
+                'alias' => 'claude-sonnet-1-3',
                 'upstream_model' => 'hy3',
-                'display_name' => 'hy3',
+                'display_name' => 'B.AI · hy3',
                 'max_tokens' => 32000,
-                'legacy_aliases' => ['claude-opus_hy3'],
+                'legacy_aliases' => ['claude-opus-4-5', 'claude-opus_hy3'],
                 'repair_incomplete_sse' => true,
             ],
         ];
