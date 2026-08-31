@@ -11,7 +11,7 @@ proxy.php     # B.AI Provider、协议适配和代理服务
 .env          # 本机 B.AI API Key，请勿提交 Git
 start.bat     # Windows 启动脚本
 README.md     # 使用说明
-proxy.log     # 运行时调试日志，按需生成
+log/          # 每次下游消息请求的独立日志
 ```
 
 `php8.3.2nts/`（PHP 运行时）和 `vendor/`（Workerman 依赖）不入库，需按下面的方式准备。
@@ -44,6 +44,7 @@ BAI_QUEUE_MAX_BYTES=67108864
 BAI_RETRY_MAX=3
 BAI_RETRY_BASE_MS=1000
 BAI_RETRY_MAX_DELAY=30
+BAI_LOG_ENABLED=1
 BAI_LOG_BODY=1
 BAI_LOG_MAX_BYTES=65536
 ```
@@ -54,9 +55,30 @@ BAI_LOG_MAX_BYTES=65536
 
 ## 调试日志
 
-运行后会在根目录生成 `proxy.log`。每条事件是缩进的 JSON 区块，并以分隔线隔开，便于直接查看；它记录下游和 B.AI 上游的请求、响应、SSE 分块、429 重试和网络错误，认证信息不会写入日志。
+`BAI_LOG_ENABLED=1` 时，代理会将日志写入根目录的 `log/` 文件夹；设为 `0` 后不会创建或写入任何会话日志。健康检查、模型发现和连通性探测不会生成日志文件。
 
-`BAI_LOG_BODY=1` 会记录请求与响应正文，单条最多 `BAI_LOG_MAX_BYTES` 字节，适合本次排错。正文可能包含敏感内容，测试结束后请关闭正文记录（设为 `0`）并安全删除 `proxy.log`。
+每次下游 `POST /v1/messages` 都会生成一个独立文件，文件名使用该请求到达代理时的 UTC 时间，例如：
+
+```text
+20260901T143522.123456Z-r0000000042-a7c91e4b.log
+```
+
+时间后附带请求序号和随机后缀，避免并发请求及代理重启后重名。一次请求发生 429 并重试时仍写入原文件，不会拆分日志。每条事件是缩进的 JSON 区块，并以分隔线隔开；认证信息不会写入日志。
+
+`BAI_LOG_BODY=1` 会记录请求与响应正文，单条最多 `BAI_LOG_MAX_BYTES` 字节，适合本次排错。正文可能包含敏感内容，测试结束后请关闭正文记录（设为 `0`）并安全删除 `log/` 中不再需要的日志。
+
+旧版本生成的根目录 `proxy.log` 不会被程序继续写入，也不会自动删除。
+
+## 代码结构
+
+实现仍集中在 `proxy.php`，按职责划分为：
+
+- `ProxyConfig`：读取并校验环境配置。
+- `ModelCatalog`：维护 B.AI 模型映射和 `/v1/models` 数据。
+- `BaiProtocol`：处理 Anthropic JSON、SSE、错误和模型名转换。
+- `SessionLogFactory` / `RequestLog`：创建并写入每个请求的独立日志。
+- `RequestSession`：保存一次请求在排队、重试和流式转发期间的状态。
+- `BaiProxyServer`：处理 HTTP 路由、自适应并发、队列及 429 重试。
 
 B.AI API Key：
 
