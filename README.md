@@ -1,8 +1,7 @@
 # Claude Code Desktop · B.AI 本地代理
 
-这是一个只针对 B.AI 上游平台的 Claude Code Desktop 本地代理。所有代理代码都在 `proxy.php`，项目不会加载、切换或支持其他上游平台。
+这是一个只针对 B.AI 上游平台的 Claude Code Desktop 本地代理。
 
-代理只监听 `127.0.0.1`。调试日志会脱敏认证信息，但在启用正文记录时会包含提示词和回复正文。
 
 ## 文件结构
 
@@ -14,24 +13,11 @@ README.md     # 使用说明
 log/          # 每次下游消息请求的独立日志
 ```
 
-`php8.3.2nts/`（PHP 运行时）和 `vendor/`（Workerman 依赖）不入库，需按下面的方式准备。
-
-## 依赖安装
-
-本仓库不包含 PHP 运行环境和第三方依赖，首次使用前需要：
-
-1. 下载 PHP 8.3+（NTS 版本）并解压到项目根目录的 `php8.3.2nts\` 文件夹。
-2. 安装 PHP 依赖：
-
-```bash
-composer install
-```
-
 双击 `start.bat` 或运行 `.\start.bat` 即可启动代理。
 
 ## 配置
 
-在项目根目录创建 `.env`：
+在项目根目录配置 `.env`：
 
 ```dotenv
 BAI_API_KEY=你的_BAI_API_KEY
@@ -96,7 +82,7 @@ B.AI API Key：
 | `claude-sonnet-1-3` | `hy3` | 32000 |
 | `claude-sonnet-1-4` | `glm-5.3-flash` | 131072 |
 
-GLM-5.3-Flash 当前为 B.AI 的 API 0 Credits 活动；价格和活动可能变动，请以 B.AI 控制台为准。代理只接受此表和 `/v1/models` 返回的模型 ID。代理会保留请求的 `max_tokens`，仅在它超出此表上限时裁剪；探测请求的 `max_tokens` 为 `1` 或 `2` 时会改为 `16`。Hy3 缺少 SSE 结束事件时，代理会按需补齐。
+B.AI 价格和活动可能变动，请以 B.AI 控制台为准。代理只接受此表和 `/v1/models` 返回的模型 ID。代理会保留请求的 `max_tokens`，仅在它超出此表上限时裁剪；探测请求的 `max_tokens` 为 `1` 或 `2` 时会改为 `16`。Hy3 缺少 SSE 结束事件时，代理会按需补齐。
 
 ## 流式行为
 
