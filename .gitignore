@@ -1,2 +1,5 @@
-/providers/*/.env
-/workerman.log
+vendor/
+.env
+*.log
+php8.3.2nts/
+composer.lock

@@ -1,49 +1,86 @@
-# Claude Code Desktop 免费本地代理
+# Claude Code Desktop · B.AI 本地代理
 
-这是一个面向 Claude Code Desktop 的可扩展本地代理。它在本机提供 Anthropic Messages 兼容接口，并通过独立 Provider 将请求转发到可用的免费模型平台。
+这是一个只针对 B.AI 上游平台的 Claude Code Desktop 本地代理。所有代理代码都在 `proxy.php`，项目不会加载、切换或支持其他上游平台。
 
-代理只监听 `127.0.0.1`，不会记录 API Key、提示词或回复正文。
+代理只监听 `127.0.0.1`。调试日志会脱敏认证信息，但在启用正文记录时会包含提示词和回复正文。
 
-## 当前 Provider
+## 文件结构
 
-| Provider | Claude 模型别名 | 上游模型 | max_tokens |
-| --- | --- | --- | ---: |
-| B.AI | `claude-sonnet-1-1` | `deepseek-v4-flash` | 32000 |
-| B.AI | `claude-sonnet-1-2` | `qwen3.8-flash` | 64000 |
-| B.AI | `claude-sonnet-1-3` | `hy3` | 32000 |
-| SiliconFlow | `claude-sonnet-2-1` | `Qwen/Qwen3-8B` | 16384 |
-| SiliconFlow | `claude-sonnet-2-2` | `Qwen/Qwen3.5-4B` | 16384 |
-| Groq | `claude-sonnet-3-1` | `qwen/qwen3.8-27b` | 16384 |
-| Groq | `claude-sonnet-3-2` | `openai/gpt-oss-120b` | 65536 |
-
-普通请求的 `max_tokens` 由 Provider 按上表设置。Claude Code Desktop 的探测请求传入 `1` 或 `2` 时，各 Provider 会改为 `16`。
-
-Groq 使用无需绑定信用卡的 Free Plan；SiliconFlow 仅配置价格为 0、名称不带 `Pro/` 的免费模型。两者仍受平台正常的公平使用速率限制，但不依赖付费套餐或短期试用额度。
-
-## 配置 Provider
-
-每个平台在自己的目录中保存注册说明、Key 地址和独立 `.env`：
-
-| Provider | 配置文档 |
-| --- | --- |
-| B.AI | [providers/b_ai/README.md](providers/b_ai/README.md) |
-| Groq | [providers/groq/README.md](providers/groq/README.md) |
-| SiliconFlow | [providers/siliconflow/README.md](providers/siliconflow/README.md) |
-
-以 B.AI 为例，复制配置模板：
-
-```powershell
-Copy-Item .\providers\b_ai\.env.example .\providers\b_ai\.env
+```text
+proxy.php     # B.AI Provider、协议适配和代理服务
+.env          # 本机 B.AI API Key，请勿提交 Git
+start.bat     # Windows 启动脚本
+README.md     # 使用说明
+proxy.log     # 运行时调试日志，按需生成
 ```
 
-编辑 `providers\b_ai\.env`：
+`php8.3.2nts/`（PHP 运行时）和 `vendor/`（Workerman 依赖）不入库，需按下面的方式准备。
+
+## 依赖安装
+
+本仓库不包含 PHP 运行环境和第三方依赖，首次使用前需要：
+
+1. 下载 PHP 8.3+（NTS 版本）并解压到项目根目录的 `php8.3.2nts\` 文件夹。
+2. 安装 PHP 依赖：
+
+```bash
+composer install
+```
+
+双击 `start.bat` 或运行 `.\start.bat` 即可启动代理。
+
+## 配置
+
+在项目根目录创建 `.env`：
 
 ```dotenv
 BAI_API_KEY=你的_BAI_API_KEY
 UPSTREAM_TIMEOUT=180
+BAI_INITIAL_CONCURRENCY=2
+BAI_MAX_CONCURRENCY=8
+BAI_QUEUE_CAPACITY=64
+BAI_QUEUE_MAX_WAIT=120
+BAI_QUEUE_MAX_BYTES=67108864
+BAI_RETRY_MAX=3
+BAI_RETRY_BASE_MS=1000
+BAI_RETRY_MAX_DELAY=30
+BAI_LOG_BODY=1
+BAI_LOG_MAX_BYTES=65536
 ```
 
-真实 `.env` 已被 Git 忽略。不要把 Key 粘贴到日志、截图或聊天内容中。
+`BAI_INITIAL_CONCURRENCY` 是启动时同时发往 B.AI 的请求数；`BAI_MAX_CONCURRENCY` 是自动调整的上限。发生 429 时，代理会读取 `Retry-After`（若有），全局暂停新请求、降低实际并发，并在队列中重试；不会立刻把 429 交给 Claude Code。请求最多重试 `BAI_RETRY_MAX` 次，并且不能超过 `BAI_QUEUE_MAX_WAIT` 秒。
+
+流式请求会等 B.AI 返回成功响应头后才开始向 Claude Code 发送 SSE。因此，首个上游响应为 429 时可以安全重试；开始输出流内容后绝不会重试，以免回复重复。
+
+## 调试日志
+
+运行后会在根目录生成 `proxy.log`。每条事件是缩进的 JSON 区块，并以分隔线隔开，便于直接查看；它记录下游和 B.AI 上游的请求、响应、SSE 分块、429 重试和网络错误，认证信息不会写入日志。
+
+`BAI_LOG_BODY=1` 会记录请求与响应正文，单条最多 `BAI_LOG_MAX_BYTES` 字节，适合本次排错。正文可能包含敏感内容，测试结束后请关闭正文记录（设为 `0`）并安全删除 `proxy.log`。
+
+B.AI API Key：
+
+- 注册/登录：https://chat.b.ai/
+- 创建 API Key：https://chat.b.ai/key
+
+不要把 Key 粘贴到日志、截图或聊天内容中。
+
+## 模型
+
+| Claude 模型别名 | B.AI 上游模型 | max_tokens |
+| --- | --- | ---: |
+| `claude-sonnet-1-1` | `deepseek-v4-flash` | 32000 |
+| `claude-sonnet-1-2` | `qwen3.8-flash` | 64000 |
+| `claude-sonnet-1-3` | `hy3` | 32000 |
+| `claude-sonnet-1-4` | `glm-5.3-flash` | 131072 |
+
+GLM-5.3-Flash 当前为 B.AI 的 API 0 Credits 活动；价格和活动可能变动，请以 B.AI 控制台为准。代理只接受此表和 `/v1/models` 返回的模型 ID。代理会保留请求的 `max_tokens`，仅在它超出此表上限时裁剪；探测请求的 `max_tokens` 为 `1` 或 `2` 时会改为 `16`。Hy3 缺少 SSE 结束事件时，代理会按需补齐。
+
+## 流式行为
+
+代理始终调用同一个 B.AI Anthropic Messages 端点：`POST /v1/messages`。它保留 Claude Code 传入的 `stream` 值：`false` 时返回完整 JSON，`true` 时转发 SSE。这样两个模式共享模型映射、请求队列、429 冷却和重试逻辑，同时维持 Claude Code 所要求的协议语义。
+
+流式连接建立前的 B.AI 错误会作为普通 JSON 响应原样返回，包括 B.AI 的错误 `code`、`message`、`Retry-After` 和请求 ID；建立 SSE 后出现的错误则按 Anthropic SSE error event 返回。
 
 ## 启动
 
@@ -53,17 +90,13 @@ UPSTREAM_TIMEOUT=180
 .\start.bat
 ```
 
-项目包含 PHP 8.3.2 和已安装的 Workerman 依赖。代理默认地址：
+代理地址：
 
 ```text
 http://127.0.0.1:8787
 ```
 
-每次启动都会清空根目录的 `workerman.log`。黑色启动窗口会实时显示不含正文和 Key 的请求/响应摘要。
-
-## Claude Code Desktop
-
-在第三方推理服务中配置：
+在 Claude Code Desktop 的第三方推理服务中配置：
 
 ```text
 Base URL: http://127.0.0.1:8787
@@ -71,65 +104,14 @@ API Key: 任意非空文本，例如 local
 认证方式: x-api-key
 ```
 
-模型发现接口只返回已配置 Provider 的模型。未映射模型返回 400，不会自动切换到其他平台。
-
-为兼容 Claude Code Desktop 的模型过滤规则，模型发现 ID 统一使用 `claude-sonnet-<平台编号>-<模型编号>`。旧别名仍可用于请求，但不会出现在发现列表中。
-
 ## 接口
 
 | 方法 | 路径 | 用途 |
 | --- | --- | --- |
-| `GET` | `/health` | Provider 状态和模型数量 |
-| `GET` | `/v1/models` | 模型发现 |
+| `GET` | `/health` | B.AI 状态、队列、实际并发及 429 计数 |
+| `GET` | `/v1/models` | B.AI 模型发现 |
 | `POST` | `/v1/messages` | Anthropic Messages 请求 |
 | `POST` | `/v1/messages/count_tokens` | 本地 token 估算 |
 | `GET/POST/HEAD` | `/api/hello` | Desktop 连通性探测 |
 
-## 新增 Provider
-
-在 `providers/<provider_id>/` 下创建：
-
-```text
-ExampleProvider.php
-.env.example
-README.md
-```
-
-`ExampleProvider.php` 必须返回一个实现 `ClaudeCodeProxy\ProviderInterface` 的实例。代理会自动扫描 `providers/*/*Provider.php`，无需修改 HTTP 入口。
-
-Provider 需要声明：
-
-- 小写 snake_case 平台 ID。
-- 符合 `claude-sonnet-<平台编号>-<模型编号>` 的唯一发现别名、上游模型和 `max_tokens`。
-- 配置状态和安全提示。
-- 上游地址、认证头和请求转换。
-- JSON/SSE 响应适配器。
-
-重复平台 ID 或重复模型别名会使代理拒绝启动，避免静默覆盖路由。
-
-## 项目结构
-
-```text
-proxy.php              # 通用启动入口
-config.php             # 非敏感代理配置
-start.bat              # Windows 启动脚本
-src/                   # 通用路由、协议、日志与 Provider 注册
-providers/b_ai/        # B.AI 实现与独立配置
-providers/groq/        # Groq 实现与独立配置
-providers/siliconflow/ # SiliconFlow 实现与独立配置
-php8.3.2nts/           # PHP 运行时
-vendor/                # Composer 依赖
-tests/run.php          # 无额外依赖的回归测试
-```
-
-运行测试：
-
-```powershell
-.\php8.3.2nts\php.exe .\tests\run.php
-```
-
-常见错误：
-
-- 没有可用模型：检查对应 Provider 目录中的 `.env`。
-- `429`：上游平台限流，稍后重试。
-- `502`：上游连接失败，检查网络和平台状态。
+模型别名不属于上述 B.AI 映射时返回 400，不会自动切换到其他平台。
