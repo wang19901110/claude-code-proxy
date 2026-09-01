@@ -14,6 +14,7 @@ final class ProxyConfig
 {
     public function __construct(
         public readonly string $apiKey,
+        public readonly string $modelsFile,
         public readonly int $upstreamTimeout,
         public readonly int $initialConcurrency,
         public readonly int $maxConcurrency,
@@ -36,6 +37,7 @@ final class ProxyConfig
 
         return new self(
             apiKey: trim($env['BAI_API_KEY'] ?? ''),
+            modelsFile: trim($env['BAI_MODELS_FILE'] ?? '') ?: 'models.json',
             upstreamTimeout: self::envInt($env, 'UPSTREAM_TIMEOUT', 180, 30),
             initialConcurrency: $initialConcurrency,
             maxConcurrency: self::envInt($env, 'BAI_MAX_CONCURRENCY', 8, $initialConcurrency, 64),
@@ -87,17 +89,73 @@ final class ProxyConfig
 
 final class ModelCatalog
 {
-    private const MODELS = [
-        ['alias' => 'claude-sonnet-1-1', 'upstream' => 'deepseek-v4-flash', 'name' => 'deepseek-v4-flash', 'max_tokens' => 32000],
-        ['alias' => 'claude-sonnet-1-2', 'upstream' => 'qwen3.8-flash', 'name' => 'qwen3.8-flash', 'max_tokens' => 64000],
-        ['alias' => 'claude-sonnet-1-3', 'upstream' => 'hy3', 'name' => 'hy3', 'max_tokens' => 32000, 'repair_sse' => true],
-        ['alias' => 'claude-sonnet-1-4', 'upstream' => 'glm-5.3-flash', 'name' => 'glm-5.3-flash', 'max_tokens' => 131072],
-    ];
+    private const DEFAULT_MAX_TOKENS = 131072;
+
+    private array $models;
+
+    public static function fromFile(string $path): self
+    {
+        if (!is_file($path)) {
+            throw new RuntimeException("Model configuration file not found: {$path}");
+        }
+
+        $contents = file_get_contents($path);
+        $config = json_decode($contents === false ? '' : $contents, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new RuntimeException("Invalid model configuration JSON: {$path}");
+        }
+
+        $definitions = $config['models'] ?? $config;
+        if (!is_array($definitions) || $definitions === []) {
+            throw new RuntimeException("Model configuration must contain a non-empty models array: {$path}");
+        }
+
+        return new self($definitions);
+    }
+
+    private function __construct(array $definitions)
+    {
+        $this->models = [];
+        $seen = [];
+        foreach (array_values($definitions) as $index => $definition) {
+            if (is_string($definition)) {
+                $definition = ['upstream' => $definition];
+            }
+            if (!is_array($definition)) {
+                throw new RuntimeException('Each model definition must be a JSON object or string.');
+            }
+
+            $upstream = trim((string) ($definition['upstream'] ?? $definition['name'] ?? ''));
+            if ($upstream === '') {
+                throw new RuntimeException(sprintf('Model definition at index %d is missing upstream.', $index));
+            }
+            if (isset($seen[$upstream])) {
+                throw new RuntimeException("Duplicate upstream model in model configuration: {$upstream}");
+            }
+            $seen[$upstream] = true;
+
+            $maxTokens = filter_var($definition['max_tokens'] ?? self::DEFAULT_MAX_TOKENS, FILTER_VALIDATE_INT);
+            if ($maxTokens === false || $maxTokens <= 0) {
+                $maxTokens = self::DEFAULT_MAX_TOKENS;
+            }
+
+            $model = [
+                'alias' => 'claude-sonnet-1-' . ($index + 1),
+                'upstream' => $upstream,
+                'name' => trim((string) ($definition['display_name'] ?? $definition['name'] ?? $upstream)) ?: $upstream,
+                'max_tokens' => $maxTokens,
+            ];
+            if (($definition['repair_sse'] ?? false) === true) {
+                $model['repair_sse'] = true;
+            }
+            $this->models[] = $model;
+        }
+    }
 
     public function find(string $requested): ?array
     {
         $requested = trim($requested);
-        foreach (self::MODELS as $model) {
+        foreach ($this->models as $model) {
             if ($model['alias'] === $requested) {
                 return ['model' => $model, 'client_alias' => $model['alias']];
             }
@@ -107,7 +165,7 @@ final class ModelCatalog
 
     public function count(): int
     {
-        return count(self::MODELS);
+        return count($this->models);
     }
 
     public function discovery(): array
@@ -120,7 +178,7 @@ final class ModelCatalog
             'max_input_tokens' => null,
             'max_tokens' => $model['max_tokens'],
             'capabilities' => null,
-        ], self::MODELS);
+        ], $this->models);
     }
 }
 
@@ -1143,7 +1201,7 @@ if ($config->apiKey === '') {
 
 $server = new BaiProxyServer(
     $config,
-    new ModelCatalog(),
+    ModelCatalog::fromFile(__DIR__ . DIRECTORY_SEPARATOR . $config->modelsFile),
     new SessionLogFactory(
         $config->logEnabled,
         __DIR__ . '/log',

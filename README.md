@@ -7,6 +7,7 @@
 
 ```text
 proxy.php     # B.AI Provider、协议适配和代理服务
+models.json   # B.AI 模型及其协议参数
 .env          # 本机 B.AI API Key，请勿提交 Git
 start.bat     # Windows 启动脚本
 README.md     # 使用说明
@@ -17,10 +18,11 @@ log/          # 每次下游消息请求的独立日志
 
 ## 配置
 
-在项目根目录配置 `.env`：
+复制 `.env.example` 为 `.env`，再在项目根目录配置真实的 B.AI API Key：
 
 ```dotenv
 BAI_API_KEY=你的_BAI_API_KEY
+BAI_MODELS_FILE=models.json
 UPSTREAM_TIMEOUT=180
 BAI_INITIAL_CONCURRENCY=2
 BAI_MAX_CONCURRENCY=8
@@ -75,12 +77,7 @@ B.AI API Key：
 
 ## 模型
 
-| Claude 模型别名 | B.AI 上游模型 | max_tokens |
-| --- | --- | ---: |
-| `claude-sonnet-1-1` | `deepseek-v4-flash` | 32000 |
-| `claude-sonnet-1-2` | `qwen3.8-flash` | 64000 |
-| `claude-sonnet-1-3` | `hy3` | 32000 |
-| `claude-sonnet-1-4` | `glm-5.3-flash` | 131072 |
+模型配置在 `models.json` 中。代理按 JSON 数组顺序自动生成 `claude-sonnet-1-1`、`claude-sonnet-1-2` 等别名；每个模型可配置 `upstream`、`display_name`、`max_tokens` 和可选的 `repair_sse` 字段。数组顺序就是 Claude alias 的编号顺序。
 
 B.AI 价格和活动可能变动，请以 B.AI 控制台为准。代理只接受此表和 `/v1/models` 返回的模型 ID。代理会保留请求的 `max_tokens`，仅在它超出此表上限时裁剪；探测请求的 `max_tokens` 为 `1` 或 `2` 时会改为 `16`。Hy3 缺少 SSE 结束事件时，代理会按需补齐。
 
